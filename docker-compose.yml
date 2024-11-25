@@ -1,0 +1,53 @@
+version: '3.8'
+services:
+  payload:
+    image: node:18-alpine
+    ports:
+      - '3000:3000'
+    volumes:
+      - .:/home/node/app
+      - node_modules:/home/node/app/node_modules
+    working_dir: /home/node/app/
+    command: sh -c "yarn install && yarn dev"
+    depends_on:
+      mongo:
+        condition: service_healthy
+    environment:
+      DATABASE_URI: mongodb://rootuser:rootpassword@mongo:27017/userdb?authSource=admin
+      MONGODB_URI: mongodb://rootuser:rootpassword@mongo:27017/userdb?authSource=admin
+    env_file:
+      - .env
+    networks:
+      - app-network
+
+  mongo:
+    image: mongo:7.0
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb-data:/data/db
+      - ./mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: rootuser
+      MONGO_INITDB_ROOT_PASSWORD: rootpassword
+      MONGO_INITDB_DATABASE: userdb
+    command:
+      - --storageEngine=wiredTiger
+      - --auth
+    restart: always
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh mongodb://rootuser:rootpassword@localhost:27017/userdb?authSource=admin --quiet
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  mongodb-data:
+  node_modules:
